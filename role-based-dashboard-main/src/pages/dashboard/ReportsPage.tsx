@@ -20,6 +20,9 @@ const ReportsPage = () => {
   const [tasksByStatusData, setTasksByStatusData] = useState<any[]>([]);
   const [tasksByPriorityData, setTasksByPriorityData] = useState<any[]>([]);
   const [totalTasks, setTotalTasks] = useState<number>(0);
+  const [selectedRole, setSelectedRole] = useState<
+    "Developer" | "Manager" | "Admin"
+  >("Developer");
 
   const fillStatus = {
     TO_DO: "hsl(210, 100%, 60%)",
@@ -49,7 +52,8 @@ const ReportsPage = () => {
     let mounted = true;
     const load = async () => {
       try {
-        const tasks: any = await api.get("/Task/getall?role=Developer");
+        // fetch tasks for the currently selected role
+        const tasks: any = await api.get(`/Task/getall?role=${selectedRole}`);
         const list = Array.isArray(tasks) ? tasks : [];
         if (!mounted) return;
 
@@ -98,7 +102,7 @@ const ReportsPage = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [selectedRole]);
 
   const completionRate = totalTasks
     ? Math.round(
@@ -130,8 +134,25 @@ const ReportsPage = () => {
                   {totalTasks}
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <ClipboardList className="w-6 h-6 text-primary" />
+              <div className="flex items-center gap-2">
+                <div className="w-36 text-right text-xs text-muted-foreground">
+                  Viewing role
+                </div>
+                <div className="inline-flex items-center gap-2">
+                  {(["Developer", "Manager", "Admin"] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setSelectedRole(r)}
+                      className={`px-3 py-1 rounded text-sm font-medium border ${
+                        selectedRole === r
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-foreground border-border"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </CardContent>
@@ -158,7 +179,9 @@ const ReportsPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Tasks by Status</CardTitle>
+            <CardTitle className="text-lg">
+              Tasks by Status — {selectedRole}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[360px]">
@@ -191,7 +214,9 @@ const ReportsPage = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Tasks by Priority</CardTitle>
+            <CardTitle className="text-lg">
+              Tasks by Priority — {selectedRole}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[360px]">

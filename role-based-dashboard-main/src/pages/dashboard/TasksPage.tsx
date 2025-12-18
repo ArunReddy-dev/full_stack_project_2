@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Task, TaskStatus, TaskPriority } from "@/types/task";
 import api from "@/lib/api";
@@ -91,6 +92,7 @@ const initialTasks: Task[] = [
 
 const TasksPage = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
@@ -259,8 +261,15 @@ const TasksPage = () => {
     return matchesSearch && matchesPriority;
   });
 
-  // For employees/developers, only show tasks assigned to them
-  if (user?.role === "developer") {
+  // Allow optional ?assignedTo=<id> query param to explicitly filter to an assignee
+  const params = new URLSearchParams(location.search);
+  const assignedToParam = params.get("assignedTo");
+  if (assignedToParam) {
+    filteredTasks = filteredTasks.filter(
+      (task) => String(task.assigned_to) === String(assignedToParam)
+    );
+  } else if (user?.role === "developer") {
+    // default behaviour for developers: only show tasks assigned to them
     filteredTasks = filteredTasks.filter(
       (task) => String(task.assigned_to) === String(user.emp_id)
     );
@@ -373,6 +382,7 @@ const TasksPage = () => {
           <TaskKanbanBoard
             tasks={filteredTasks}
             onTaskUpdate={handleTaskUpdate}
+            onTaskModified={() => fetchTasks()}
           />
         ) : (
           <div className="text-muted-foreground text-center py-12">

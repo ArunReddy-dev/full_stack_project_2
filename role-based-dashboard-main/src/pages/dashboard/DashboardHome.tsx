@@ -1,5 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import CreateTaskModal from "@/components/dashboard/CreateTaskModal";
 import StatsCard from "@/components/dashboard/StatsCard";
 import api from "@/lib/api";
 import {
@@ -40,6 +42,9 @@ const DashboardHome = () => {
   const [inProgressCount, setInProgressCount] = useState<number>(0);
   const [completedCount, setCompletedCount] = useState<number>(0);
   const [reviewCount, setReviewCount] = useState<number>(0);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const navigate = useNavigate();
 
   const mapRoleToBackend = (r?: string) => {
     if (!r) return "Developer";
@@ -98,7 +103,7 @@ const DashboardHome = () => {
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [user, refreshKey]);
 
   return (
     <div className="p-8">
@@ -158,25 +163,15 @@ const DashboardHome = () => {
         </div>
 
         {user?.role === "admin" && (
-          <>
-            <div className="animate-fade-in" style={{ animationDelay: "0.5s" }}>
-              <StatsCard
-                title="Total Tasks"
-                value={totalTasks}
-                description="All tasks"
-                icon={TrendingUp}
-                trend={{ value: 3, isPositive: true }}
-              />
-            </div>
-            <div className="animate-fade-in" style={{ animationDelay: "0.6s" }}>
-              <StatsCard
-                title="Overdue"
-                value="—"
-                description="Needs attention"
-                icon={AlertCircle}
-              />
-            </div>
-          </>
+          <div className="animate-fade-in" style={{ animationDelay: "0.5s" }}>
+            <StatsCard
+              title="Total Tasks"
+              value={totalTasks}
+              description="All tasks"
+              icon={TrendingUp}
+              trend={{ value: 3, isPositive: true }}
+            />
+          </div>
         )}
       </div>
 
@@ -187,7 +182,10 @@ const DashboardHome = () => {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {user?.role !== "developer" && (
-            <button className="gradient-card border border-border rounded-xl p-4 text-left hover:border-primary/50 transition-all duration-200 group">
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="gradient-card border border-border rounded-xl p-4 text-left hover:border-primary/50 transition-all duration-200 group"
+            >
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
                 <ClipboardList className="w-5 h-5 text-primary" />
               </div>
@@ -198,7 +196,12 @@ const DashboardHome = () => {
             </button>
           )}
 
-          <button className="gradient-card border border-border rounded-xl p-4 text-left hover:border-primary/50 transition-all duration-200 group">
+          <button
+            onClick={() =>
+              navigate(`/dashboard/tasks?assignedTo=${user?.emp_id}`)
+            }
+            className="gradient-card border border-border rounded-xl p-4 text-left hover:border-primary/50 transition-all duration-200 group"
+          >
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
               <CheckCircle2 className="w-5 h-5 text-primary" />
             </div>
@@ -206,19 +209,12 @@ const DashboardHome = () => {
             <p className="text-sm text-muted-foreground">See assigned items</p>
           </button>
 
-          {user?.role === "admin" && (
-            <button className="gradient-card border border-border rounded-xl p-4 text-left hover:border-primary/50 transition-all duration-200 group">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
-                <Users className="w-5 h-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-foreground mb-1">Add Employee</h3>
-              <p className="text-sm text-muted-foreground">
-                Onboard new team members
-              </p>
-            </button>
-          )}
+          {/* Add Employee quick action removed per request */}
 
-          <button className="gradient-card border border-border rounded-xl p-4 text-left hover:border-primary/50 transition-all duration-200 group">
+          <button
+            onClick={() => navigate("/dashboard/reports")}
+            className="gradient-card border border-border rounded-xl p-4 text-left hover:border-primary/50 transition-all duration-200 group"
+          >
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
               <TrendingUp className="w-5 h-5 text-primary" />
             </div>
@@ -229,6 +225,15 @@ const DashboardHome = () => {
           </button>
         </div>
       </div>
+      {/* Create Task modal instance used by Quick Actions */}
+      <CreateTaskModal
+        open={isCreateOpen}
+        onOpenChange={(v) => {
+          setIsCreateOpen(v);
+          if (!v) setRefreshKey((k) => k + 1);
+        }}
+        onTaskCreate={() => setRefreshKey((k) => k + 1)}
+      />
     </div>
   );
 };

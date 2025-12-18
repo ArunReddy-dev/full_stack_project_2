@@ -54,6 +54,7 @@ class TaskSchema(Base):
     created_by=Column(Integer, ForeignKey("employees.e_id"))
     expected_closure=Column(DateTime,nullable=False)
     actual_closure=Column(DateTime)
+    # attachments will be stored in a separate table
     
     def __repr__(self):
         return f"<Task(t_id={self.t_id}, title={self.title}, status={self.status})>"
@@ -77,6 +78,20 @@ class UserSchema(Base):
     status = Column(SAEnum(UserStatus), default=UserStatus.ACTIVE, nullable=False)
     def __repr__(self):
         return f"<User(e_id={self.e_id}, roles={self.roles}, status={self.status})>"
+
+
+class AttachmentSchema(Base):
+    __tablename__ = "attachments"
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.t_id"), nullable=False)
+    filename = Column(String(255), nullable=False)
+    filepath = Column(String(512), nullable=False)
+    remark = Column(String(1000))
+    created_by = Column(Integer, ForeignKey("employees.e_id"))
+    created_at = Column(DateTime, default=datetime.now)
+
+    def __repr__(self):
+        return f"<Attachment(id={self.id}, task_id={self.task_id}, filename={self.filename})>"
 
 
 Base.metadata.create_all(bind=engine)

@@ -47,8 +47,11 @@ def get_all_tasks(role,user):
 	try:
 		session = get_connection()
 		if role == "Manager":
-			if "Manager" in user.roles: 
-				tasks = session.query(TaskSchema).filter(TaskSchema.reviewer == user.e_id).all()
+			# Allow Managers to view all tasks in the "All Tasks" section.
+			# Previously this returned only tasks where reviewer == manager. Change to return all tasks
+			# for Manager role so managers can inspect and manage tasks across the board.
+			if "Manager" in user.roles:
+				tasks = session.query(TaskSchema).all()
 			else:
 				raise HTTPException(status_code=403,detail="Not Authorized")
 		elif role=="Admin" :
@@ -109,14 +112,23 @@ def update_task(t_id: int, updated: dict, role,user):
 		if "assigned_to" in updated and updated.get("assigned_to") and not t.assigned_at:
 			t.assigned_at = datetime.now()
 
-		# handle status -> if changed to DONE set actual_closure
+		# handle status -> enforce rules and set actual_closure when moved to DONE
 		if "status" in updated:
 			new_status = updated.get("status")
 			if new_status:
-				if new_status.upper() == "DONE":
+				# Normalize to upper for comparisons
+				ns = str(new_status).upper()
+				# If manager is trying to mark as DONE, ensure they're the reviewer
+				if ns == "DONE":
+					# Only set actual_closure when moving to done
 					t.actual_closure = datetime.now()
-				if t.status.upper()=="IN_PROGRESS":
-					raise HTTPException(status_code=403,detail="Only assigned employee can change the status of task in progress")
+					if role == "Manager":
+						if user.e_id != t.reviewer:
+							raise HTTPException(status_code=403, detail="Only the reviewer can mark the task as Done")
+				# Prevent non-assigned users from changing IN_PROGRESS tasks to something else via update
+				if t.status and str(t.status).upper() == "IN_PROGRESS":
+					# Only assigned employee should be moving IN_PROGRESS -> REVIEW via patch endpoint; disallow via update
+					raise HTTPException(status_code=403,detail="Only assigned employee can change the status of a task in progress")
 
 		for key, value in updated.items():
 			setattr(t, key, value)

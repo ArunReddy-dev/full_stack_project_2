@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.routers.employee_router import employee_router
 from app.routers.user_router import users_router
 from app.routers.task_router import task_router
@@ -46,6 +47,11 @@ app.include_router(employee_router, prefix="/api", tags=["Employees"])
 app.include_router(users_router, prefix="/api", tags=["Users"])
 app.include_router(task_router, prefix="/api", tags=["Tasks"])
 app.include_router(remark_router, prefix="/api", tags=["Remarks"])
+
+# Serve uploaded files
+uploads_dir = os.path.join(os.getcwd(), "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 @app.get("/", tags=["Root"])
 async def root():
