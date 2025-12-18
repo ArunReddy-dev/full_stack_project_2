@@ -42,19 +42,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     const accessToken = data.access_token as string;
     const backendUser = data.user as any;
 
-    const frontendRole =
-      Array.isArray(backendUser.roles) && backendUser.roles.length > 0
-        ? mapBackendRoleToFrontend(backendUser.roles[0])
-        : "developer";
+    // map backend roles array to frontend lowercase roles
+    const mappedRoles: string[] = Array.isArray(backendUser.roles)
+      ? backendUser.roles.map((r: string) => (r || "").toLowerCase())
+      : ["developer"];
+
+    const active =
+      mappedRoles.length > 0 ? (mappedRoles[0] as User["role"]) : "developer";
 
     const loggedInUser: User = {
       emp_id: backendUser.e_id,
-      role: frontendRole as User["role"],
+      role: active,
+      roles: mappedRoles as User["roles"],
       token: accessToken,
     };
 
     setUser(loggedInUser);
     localStorage.setItem("user", JSON.stringify(loggedInUser));
+    // Try to fetch employee details (name) so UI can greet by name
+    try {
+      const emp = await api.get(`/Employee/get?id=${backendUser.e_id}`);
+      const name = emp?.name || emp?.full_name || null;
+      if (name) {
+        const updated: User = { ...loggedInUser, name };
+        setUser(updated);
+        localStorage.setItem("user", JSON.stringify(updated));
+      }
+    } catch (err) {
+      // ignore if employee info not available
+    }
+  };
+
+  const switchRole = (newRole: User["role"]) => {
+    if (!user) return;
+    const updated: User = { ...user, role: newRole };
+    setUser(updated);
+    localStorage.setItem("user", JSON.stringify(updated));
   };
 
   const logout = () => {
@@ -64,7 +87,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, isAuthenticated: !!user }}
+      value={{ user, login, logout, isAuthenticated: !!user, switchRole }}
     >
       {children}
     </AuthContext.Provider>

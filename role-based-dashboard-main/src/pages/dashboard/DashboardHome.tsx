@@ -16,12 +16,9 @@ import {
 const DashboardHome = () => {
   const { user } = useAuth();
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
+  // use a simple welcome + user name (if available)
+  const [localName, setLocalName] = useState<string | null>(null);
+  const getGreeting = () => "Welcome";
 
   const getRoleDescription = () => {
     switch (user?.role) {
@@ -100,6 +97,20 @@ const DashboardHome = () => {
       }
     };
     loadStats();
+    // If user has no name in context, try fetching employee details to show friendly name
+    const loadNameIfMissing = async () => {
+      if (!user) return;
+      if (user.name) return;
+      try {
+        const emp: any = await api.get(`/Employee/get?id=${user.emp_id}`);
+        if (!mounted) return;
+        const name = emp?.name || emp?.full_name || null;
+        if (name) setLocalName(name);
+      } catch (err) {
+        // ignore
+      }
+    };
+    loadNameIfMissing();
     return () => {
       mounted = false;
     };
@@ -110,7 +121,10 @@ const DashboardHome = () => {
       {/* Header */}
       <div className="mb-8 animate-fade-in">
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          {getGreeting()}, <span className="text-gradient">{user?.emp_id}</span>
+          {getGreeting()},{" "}
+          <span className="text-gradient">
+            {localName || user?.name || user?.emp_id}
+          </span>
         </h1>
         <p className="text-muted-foreground">{getRoleDescription()}</p>
       </div>

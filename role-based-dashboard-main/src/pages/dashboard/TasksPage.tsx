@@ -273,6 +273,18 @@ const TasksPage = () => {
     filteredTasks = filteredTasks.filter(
       (task) => String(task.assigned_to) === String(user.emp_id)
     );
+  } else if (user?.role === "manager") {
+    // Managers should only see tasks that are assigned to or under their review.
+    // This prevents unrelated tasks ("garbage") from appearing in the manager view.
+    filteredTasks = filteredTasks.filter((task) => {
+      const assignedToMatch =
+        task.assigned_to !== undefined &&
+        String(task.assigned_to) === String(user.emp_id);
+      const reviewerMatch =
+        task.reviewer !== undefined &&
+        String(task.reviewer) === String(user.emp_id);
+      return assignedToMatch || reviewerMatch;
+    });
   }
 
   return (

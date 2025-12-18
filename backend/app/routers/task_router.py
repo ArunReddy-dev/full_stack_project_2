@@ -24,7 +24,8 @@ def get_all(role: UserRole,user=Depends(get_current_user)):
 @task_router.get("/getbystatus",response_model=List[TaskReqRes])
 def get_by_status(status,role,user=Depends(get_current_user)):
     try:
-        if role not in user.roles:
+        # allow Admin to assume other roles
+        if role not in user.roles and "Admin" not in user.roles:
             raise HTTPException(status_code=409,detail="The user doesnt have the mentioned role")
         return get_task_by_status(status,role,user)
     except HTTPException as e:
@@ -59,7 +60,8 @@ def get_by_id(id: int,user=Depends(get_current_user)):
 @task_router.put("/update")
 def update_task_data(id: int, new_data: dict,role,user=Depends(get_current_user)):
     try:
-        if role not in user.roles:
+        # allow Admin to assume other roles
+        if role not in user.roles and "Admin" not in user.roles:
             raise HTTPException(status_code=409, detail="The user doesnt have the mentioned role")
 
         # Business rule: Admins are not allowed to update tasks at all.
@@ -77,7 +79,8 @@ def update_task_data(id: int, new_data: dict,role,user=Depends(get_current_user)
 @task_router.patch("/patch")
 def patch_stat(id,status,role,user=Depends(get_current_user)):
     try:
-        if role not in user.roles and role.upper() !="ADMIN":
+        # allow Admin to assume other roles
+        if role not in user.roles and "Admin" not in user.roles:
             raise HTTPException(status_code=409,detail="The user doesnt have the mentioned role")
         patched=patch_status(id,status,role,user)
         return {"detail":"Patched the task"}
@@ -90,7 +93,8 @@ def patch_stat(id,status,role,user=Depends(get_current_user)):
 @task_router.delete("/delete")
 def delete_task_by_id(id: int,role,user=Depends(get_current_user)):
     try:
-        if role.upper()!="ADMIN" and role not in user.roles:
+        # delete allowed only when acting as Admin (or if user actually has Admin role)
+        if role.upper()!="ADMIN" and "Admin" not in user.roles:
             raise HTTPException(status_code=409,detail="Only the Admin can delete the task")
         resp = delete_task(role,user,id)
         return resp
@@ -114,7 +118,8 @@ def attach_file(
     """
     try:
         # role validation
-        if role and role not in user.roles and role.upper() != "ADMIN":
+        # allow Admin to assume other roles
+        if role and role not in user.roles and "Admin" not in user.roles:
             raise HTTPException(status_code=409, detail="The user doesnt have the mentioned role")
 
         # save file to uploads/<task_id>/filename
