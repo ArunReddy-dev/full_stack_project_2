@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -69,8 +69,16 @@
     --done-border: 142 76% 36%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 50%), hsl(199 89% 48%));
-    --gradient-navbar: linear-gradient(135deg, hsl(222 47% 18%), hsl(222 47% 24%));
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(217 91% 50%),
+      hsl(199 89% 48%)
+    );
+    --gradient-navbar: linear-gradient(
+      135deg,
+      hsl(222 47% 18%),
+      hsl(222 47% 24%)
+    );
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 20% 98%));
 
     /* Shadows */
@@ -130,8 +138,16 @@
     --done-border: 142 76% 40%;
 
     /* Gradients - dark mode */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 55%), hsl(199 89% 50%));
-    --gradient-navbar: linear-gradient(135deg, hsl(222 47% 8%), hsl(222 47% 12%));
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(217 91% 55%),
+      hsl(199 89% 50%)
+    );
+    --gradient-navbar: linear-gradient(
+      135deg,
+      hsl(222 47% 8%),
+      hsl(222 47% 12%)
+    );
     --gradient-card: linear-gradient(180deg, hsl(222 47% 10%), hsl(222 47% 8%));
 
     /* Shadows - dark mode */
@@ -148,7 +164,7 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: "Inter", system-ui, sans-serif;
   }
 }
 
@@ -182,6 +198,47 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  /* Kanban column helpers (status colors and soft plates) */
+  .bg-todo {
+    background-color: hsl(var(--todo));
+  }
+  .bg-inprogress {
+    background-color: hsl(var(--inprogress));
+  }
+  .bg-review {
+    background-color: hsl(var(--review));
+  }
+  .bg-done {
+    background-color: hsl(var(--done));
+  }
+
+  .border-todo-border {
+    border-color: hsl(var(--todo-border));
+  }
+  .border-inprogress-border {
+    border-color: hsl(var(--inprogress-border));
+  }
+  .border-review-border {
+    border-color: hsl(var(--review-border));
+  }
+  .border-done-border {
+    border-color: hsl(var(--done-border));
+  }
+
+  /* Soft plate backgrounds for column bodies and small accents */
+  .bg-todo-plate {
+    background-color: hsl(var(--todo) / 0.08);
+  }
+  .bg-inprogress-plate {
+    background-color: hsl(var(--inprogress) / 0.08);
+  }
+  .bg-review-plate {
+    background-color: hsl(var(--review) / 0.08);
+  }
+  .bg-done-plate {
+    background-color: hsl(var(--done) / 0.08);
   }
 }
 

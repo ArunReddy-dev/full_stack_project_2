@@ -1,5 +1,5 @@
-import { Task, PRIORITY_CONFIG } from "@/types/task";
-import { Calendar, User, MessageSquare, Edit3, Trash2 } from "lucide-react";
+import { Task, PRIORITY_CONFIG, TASK_STATUS_CONFIG } from "@/types/task";
+import { Calendar, User, Edit3, Trash2, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -25,6 +25,9 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [viewMode, setViewMode] = useState<"details" | "attachments">(
+    "details"
+  );
 
   // editable form state
   const [formTitle, setFormTitle] = useState(task.title);
@@ -118,7 +121,10 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
   return (
     <>
       <div
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setViewMode("details");
+          setOpen(true);
+        }}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
@@ -127,138 +133,88 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
         className={cn(
           "bg-card rounded-lg p-4 shadow-sm border border-border transition-all duration-200 cursor-pointer",
           "hover:shadow-lg hover:scale-[1.01] hover:-translate-y-0.5",
-          isDragging && "shadow-xl scale-105 border-primary"
+          isDragging && "shadow-xl scale-105",
+          // add a subtle left status stripe using status border color
+          "border-l-4",
+          TASK_STATUS_CONFIG[task.status]?.borderColor
         )}
       >
-        {/* action icons */}
-        <div className="flex items-start justify-end gap-2 mb-2">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-              setOpen(true);
-            }}
-            className="p-1 rounded hover:bg-muted/50"
-            title="Edit task"
-          >
-            <Edit3 className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete();
-            }}
-            className="p-1 rounded hover:bg-muted/50"
-            title="Delete task"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-md bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-semibold">
-              {String(task.title || "")
-                .slice(0, 1)
-                .toUpperCase()}
+        {/* Minimal preview: title, assigned by, expected date, attachment icon, description, actions */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-md bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-semibold">
+                {String(task.title || "")
+                  .slice(0, 1)
+                  .toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-medium text-sm text-foreground line-clamp-1">
+                  {task.title}
+                </h4>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  <span className="text-[10px] font-mono">by </span>
+                  <span className="font-medium">{task.assigned_by ?? "—"}</span>
+                </div>
+              </div>
             </div>
-            <h4 className="font-medium text-sm text-foreground line-clamp-2">
-              {task.title}
-            </h4>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center text-xs text-muted-foreground">
+                <Calendar className="w-4 h-4 mr-1" />
+                <span>{format(new Date(task.expected_closure), "MMM dd")}</span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setViewMode("attachments");
+                  setOpen(true);
+                  fetchAttachments();
+                }}
+                className="text-muted-foreground/80 p-1 rounded hover:bg-muted/40"
+                title="Attachments"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "text-xs font-semibold px-2 py-1 rounded-full text-center",
-                priorityConfig.bgColor,
-                priorityConfig.color
+
+          <p className="text-sm text-muted-foreground line-clamp-2">
+            {task.description}
+          </p>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {/* Edit button: hidden for admins */}
+              {user?.role !== "admin" && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditing(true);
+                    setOpen(true);
+                    setViewMode("details");
+                  }}
+                  className="text-sm px-2 py-1 rounded bg-card hover:shadow-sm"
+                >
+                  Edit
+                </button>
               )}
-            >
-              {priorityConfig.label}
-            </span>
-            <span className="text-[11px] text-muted-foreground font-mono">
-              #{task.t_id}
-            </span>
-          </div>
-        </div>
 
-        {/* Description */}
-        <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-          {task.description}
-        </p>
-
-        {/* Task ID */}
-        <div className="text-xs text-muted-foreground mb-3 font-mono">
-          #{task.t_id}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center gap-3">
-            {task.assigned_to && (
-              <div className="flex items-center gap-1">
-                <User className="w-3 h-3" />
-                <span>{task.assigned_to}</span>
-              </div>
-            )}
-
-            {task.assigned_by && (
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] font-mono">by</span>
-                <span className="text-xs">{task.assigned_by}</span>
-              </div>
-            )}
-
-            <div className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              <span>{format(new Date(task.expected_closure), "MMM dd")}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 text-muted-foreground/70">
-              <MessageSquare className="w-3 h-3" />
-              <span>0</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Reviewer / assignee badges */}
-        <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <User className="w-3 h-3 text-muted-foreground" />
-              <div className="text-xs">
-                <div className="text-[10px] text-muted-foreground">
-                  Assignee
-                </div>
-                <div className="font-medium text-sm">
-                  {task.assigned_to ?? "Unassigned"}
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await handleDelete();
+                }}
+                className="text-sm px-2 py-1 rounded bg-destructive/10 text-destructive"
+              >
+                Delete
+              </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="text-xs">
-                <div className="text-[10px] text-muted-foreground">
-                  Reviewer
-                </div>
-                <div className="font-medium text-sm">
-                  {task.reviewer ?? "—"}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-right text-xs text-muted-foreground">
-            <div className="flex items-center gap-2 justify-end">
-              <Calendar className="w-3 h-3" />
-              <div>
-                {format(new Date(task.expected_closure), "MMM dd, yyyy")}
-              </div>
-            </div>
+            <div className="text-xs text-muted-foreground">#{task.t_id}</div>
           </div>
         </div>
       </div>
@@ -274,20 +230,50 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[600px] bg-card animate-fade-in border border-border shadow-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[640px] bg-card animate-fade-in border border-border shadow-lg rounded-xl overflow-hidden">
+          {/* Decorative header stripe using status plate color */}
+          <div
+            className={cn(
+              "h-3 w-full",
+              TASK_STATUS_CONFIG[task.status]?.bgColor + "-plate"
+            )}
+          />
+          <DialogHeader className="px-6 pt-4">
             <div className="flex items-center justify-between gap-3">
               <DialogTitle className="text-lg font-semibold">
                 {isEditing ? "Edit Task" : task.title}
               </DialogTitle>
               <div className="flex items-center gap-2">
+                {/* Action buttons moved here (Edit / Delete) for clearer preview and to avoid clutter */}
+                <div className="flex items-center gap-2">
+                  {user?.role !== "admin" && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="p-1 rounded hover:bg-muted/50"
+                      title="Edit task"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handleDelete();
+                    }}
+                    className="p-1 rounded hover:bg-muted/50"
+                    title="Delete task"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
                 <span className="text-xs text-muted-foreground">
                   {priorityConfig.label}
                 </span>
               </div>
             </div>
           </DialogHeader>
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4 mt-2 px-6 pb-6">
             {isEditing ? (
               <form
                 onSubmit={async (e) => {
@@ -434,6 +420,71 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
                   <Button type="submit">Save</Button>
                 </div>
               </form>
+            ) : viewMode === "attachments" ? (
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium mb-2">Attachments</h4>
+                <div className="space-y-2">
+                  {attachments.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">
+                      No attachments
+                    </div>
+                  ) : (
+                    attachments.map((a) => (
+                      <div
+                        key={a.id}
+                        className="flex items-center justify-between gap-3 p-2 rounded border"
+                      >
+                        <div>
+                          <div className="font-medium">{a.filename}</div>
+                          {a.remark && (
+                            <div className="text-xs text-muted-foreground">
+                              {a.remark}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`${serverBase}/uploads/${task.t_id}/${a.filename}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary underline text-sm"
+                          >
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                    ))
+                  )}
+
+                  <div className="pt-3 border-t mt-2">
+                    <div className="grid grid-cols-1 gap-2">
+                      <label className="text-xs text-muted-foreground">
+                        Add Attachment (require remark)
+                      </label>
+                      <input type="file" onChange={handleFileChange} />
+                      <textarea
+                        value={attachRemark}
+                        onChange={(e) => setAttachRemark(e.target.value)}
+                        placeholder="Enter remark (required)"
+                        className="w-full p-2 border rounded bg-background"
+                        rows={3}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setAttachFile(null);
+                            setAttachRemark("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button onClick={handleUpload}>Upload</Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">

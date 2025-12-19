@@ -176,7 +176,9 @@ const TaskKanbanBoard = ({
                     {...provided.droppableProps}
                     className={cn(
                       "min-h-[500px] p-2 rounded-b-lg transition-all duration-200",
-                      "bg-muted/30 border border-t-0 border-border",
+                      // use a soft plate background per status so columns are visually distinct
+                      `${config.bgColor}-plate`,
+                      "border border-t-0 border-border",
                       snapshot.isDraggingOver &&
                         "bg-primary/5 border-primary/30",
                       isOver && "ring-2 ring-primary/20"
