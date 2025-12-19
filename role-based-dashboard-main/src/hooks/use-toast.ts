@@ -79,7 +79,9 @@ export const reducer = (state: State, action: Action): State => {
     case "UPDATE_TOAST":
       return {
         ...state,
-        toasts: state.toasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t)),
+        toasts: state.toasts.map((t) =>
+          t.id === action.toast.id ? { ...t, ...action.toast } : t
+        ),
       };
 
     case "DISMISS_TOAST": {
@@ -103,7 +105,7 @@ export const reducer = (state: State, action: Action): State => {
                 ...t,
                 open: false,
               }
-            : t,
+            : t
         ),
       };
     }
@@ -136,6 +138,24 @@ type Toast = Omit<ToasterToast, "id">;
 
 function toast({ ...props }: Toast) {
   const id = genId();
+  const fmt = (v: any) => {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v === "string") return v;
+    if (Array.isArray(v))
+      return v
+        .map(
+          (d) => (d && d.msg) || (typeof d === "string" ? d : JSON.stringify(d))
+        )
+        .join("; ");
+    if (typeof v === "object") {
+      try {
+        return JSON.stringify(v);
+      } catch {
+        return String(v);
+      }
+    }
+    return String(v);
+  };
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -144,16 +164,21 @@ function toast({ ...props }: Toast) {
     });
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
 
+  // sanitize title/description to avoid passing raw objects/arrays as React children
+  const safeToast: ToasterToast = {
+    ...props,
+    id,
+    title: fmt((props as any).title) as any,
+    description: fmt((props as any).description) as any,
+    open: true,
+    onOpenChange: (open) => {
+      if (!open) dismiss();
+    },
+  };
+
   dispatch({
     type: "ADD_TOAST",
-    toast: {
-      ...props,
-      id,
-      open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss();
-      },
-    },
+    toast: safeToast,
   });
 
   return {

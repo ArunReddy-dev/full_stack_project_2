@@ -93,11 +93,28 @@ const EmployeesPage = () => {
       setEmployees((prev) => prev.filter((e) => e.e_id !== emp.e_id));
       toast({ title: "Deleted", description: "Employee removed" });
     } catch (err: any) {
+      // Format possible validation errors into a readable string
+      const detail = err?.data?.detail || err?.data || err?.message || err;
+      let msg = "Could not delete employee";
+      if (Array.isArray(detail)) {
+        msg = detail
+          .map(
+            (d: any) => d.msg || (typeof d === "string" ? d : JSON.stringify(d))
+          )
+          .join("; ");
+      } else if (typeof detail === "object") {
+        try {
+          msg = JSON.stringify(detail);
+        } catch {
+          msg = String(detail);
+        }
+      } else {
+        msg = String(detail);
+      }
+
       toast({
         title: "Delete Failed",
-        // Prefer server-provided detail if available
-        description:
-          err?.data?.detail || err?.message || "Could not delete employee",
+        description: msg,
         variant: "destructive",
       });
     }

@@ -183,17 +183,18 @@ def patch_status(t_id,status,role,user):
 def delete_task(role,user,t_id: int):
 	session = None
 	try:
-		if role != "Admin" and role != "Manager":
-			raise HTTPException(status_code=403,detail="Not Authorized")
-		t = session.query(TaskSchema).filter(TaskSchema.t_id == t_id).first()
-
+		# Acquire DB session first
 		session = get_connection()
-		if user.e_id != t.created_by:
-			raise HTTPException(status_code=403,detail="Not Authorized to delete the task")
-		
+		# Load task
+		t = session.query(TaskSchema).filter(TaskSchema.t_id == t_id).first()
 		if not t:
 			raise HTTPException(status_code=404, detail="Task Not Found")
 
+		# Only Admin (via role param or actual user roles) may delete tasks per router policy
+		if (not isinstance(role, str) or role.upper() != "ADMIN") and "Admin" not in getattr(user, "roles", []):
+			raise HTTPException(status_code=403, detail="Only the Admin can delete the task")
+
+		# Proceed to delete
 		session.delete(t)
 		session.commit()
 		return {"detail": "Task Deleted Successfully"}

@@ -83,12 +83,23 @@ const TaskCard = ({
       toast.success("Task deleted");
       onModified?.();
     } catch (err: any) {
-      const detail = err?.data?.detail ?? err?.message ?? "Delete failed";
-      const msg = Array.isArray(detail)
-        ? detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ")
-        : typeof detail === "object"
-        ? JSON.stringify(detail)
-        : String(detail);
+      const detail = err?.data?.detail || err?.data || err?.message || err;
+      let msg = "Delete failed";
+      if (Array.isArray(detail)) {
+        msg = detail
+          .map(
+            (d: any) => d.msg || (typeof d === "string" ? d : JSON.stringify(d))
+          )
+          .join("; ");
+      } else if (typeof detail === "object") {
+        try {
+          msg = JSON.stringify(detail);
+        } catch {
+          msg = String(detail);
+        }
+      } else {
+        msg = String(detail);
+      }
       toast.error(msg);
     }
   };
