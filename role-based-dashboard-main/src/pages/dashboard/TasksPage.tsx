@@ -286,7 +286,13 @@ const TasksPage = () => {
       const reviewerMatch =
         task.reviewer !== undefined &&
         String(task.reviewer) === String(user.emp_id);
-      return assignedToMatch || reviewerMatch;
+      const createdByUnassignedMatch =
+        (!task.assigned_to || task.assigned_to === undefined) &&
+        task.created_by &&
+        String(task.created_by) === String(user.emp_id);
+      // include tasks assigned to the manager, tasks under their review, or
+      // tasks they created that are still unassigned (show in their To-Do)
+      return assignedToMatch || reviewerMatch || createdByUnassignedMatch;
     });
   }
 
@@ -401,8 +407,105 @@ const TasksPage = () => {
             openTaskId={openTaskParam || undefined}
           />
         ) : (
-          <div className="text-muted-foreground text-center py-12">
-            List view coming soon...
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b">
+                  <th className="p-2">ID</th>
+                  <th className="p-2">Title</th>
+                  <th className="p-2">Assigned To</th>
+                  <th className="p-2">Reviewer</th>
+                  <th className="p-2">Priority</th>
+                  <th className="p-2">Status</th>
+                  <th className="p-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTasks.map((t) => (
+                  <tr key={t.t_id} className="border-b hover:bg-muted/10">
+                    <td className="p-2 align-top">{t.t_id}</td>
+                    <td className="p-2 align-top">{t.title}</td>
+                    <td className="p-2 align-top">
+                      {t.assigned_to ?? "Unassigned"}
+                    </td>
+                    <td className="p-2 align-top">{t.reviewer ?? "-"}</td>
+                    <td className="p-2 align-top">{t.priority}</td>
+                    <td className="p-2 align-top">{t.status}</td>
+                    <td className="p-2 align-top">
+                      <div className="flex gap-2">
+                        <button
+                          className="px-2 py-1 bg-card rounded"
+                          onClick={() => {
+                            // open task dialog by setting URL param so TaskCard modal opens via openTaskParam
+                            const params = new URLSearchParams(
+                              window.location.search
+                            );
+                            params.set("openTask", String(t.t_id));
+                            window.history.replaceState(
+                              {},
+                              "",
+                              `${window.location.pathname}?${params.toString()}`
+                            );
+                            // refresh page state
+                            window.location.reload();
+                          }}
+                        >
+                          View
+                        </button>
+                        <button
+                          className="px-2 py-1 bg-destructive/10 text-destructive rounded"
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                "Delete this task? This cannot be undone."
+                              )
+                            )
+                              return;
+                            try {
+                              const roleParam = mapRoleToBackend(user?.role);
+                              await api.del(
+                                `/Task/delete?id=${t.t_id}&role=${roleParam}`
+                              );
+                              toast.success("Task deleted");
+                              fetchTasks();
+                            } catch (err: any) {
+                              const detail =
+                                err?.data?.detail ||
+                                err?.data ||
+                                err?.message ||
+                                err;
+                              let msg = "Delete failed";
+                              if (Array.isArray(detail)) {
+                                msg = detail
+                                  .map(
+                                    (d: any) =>
+                                      d.msg ||
+                                      (typeof d === "string"
+                                        ? d
+                                        : JSON.stringify(d))
+                                  )
+                                  .join("; ");
+                              } else if (typeof detail === "object") {
+                                try {
+                                  msg = JSON.stringify(detail);
+                                } catch {
+                                  msg = String(detail);
+                                }
+                              } else {
+                                msg = String(detail);
+                              }
+                              toast.error(msg);
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

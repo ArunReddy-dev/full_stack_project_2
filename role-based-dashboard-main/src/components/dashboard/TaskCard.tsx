@@ -49,6 +49,11 @@ const TaskCard = ({
   const [attachments, setAttachments] = useState<Array<any>>([]);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachRemark, setAttachRemark] = useState("");
+  const [developersList, setDevelopersList] = useState<any[]>([]);
+  const [managersList, setManagersList] = useState<any[]>([]);
+  const [employeeNamesMap, setEmployeeNamesMap] = useState<
+    Record<string | number, string>
+  >({});
 
   const mapRoleToBackend = (r?: string) => {
     if (!r) return "Developer";
@@ -117,6 +122,65 @@ const TaskCard = ({
       setAttachments([]);
     }
   };
+
+  // Load developers and managers when editing so selects can be populated
+  useEffect(() => {
+    let mounted = true;
+    const loadLists = async () => {
+      try {
+        const isManager = (user?.role || "").toLowerCase() === "manager";
+        const mgrParam =
+          isManager && user?.emp_id
+            ? `&mgr_id=${encodeURIComponent(user.emp_id)}`
+            : "";
+        const devs = await api.get(
+          `/Employee/getall?designation=Developer${mgrParam}`
+        );
+        const users = await api.get(`/Users/getall`);
+        const mgrs = (users || []).filter((u: any) =>
+          Array.isArray(u.roles)
+            ? u.roles.some((r: string) => (r || "").toLowerCase() === "manager")
+            : (u.role || "").toLowerCase() === "manager"
+        );
+        const allEmps = await api.get(`/Employee/getall`);
+        const map: Record<string | number, string> = {};
+        (allEmps || []).forEach((e: any) => {
+          map[e.e_id] = e.name || String(e.e_id);
+        });
+        if (!mounted) return;
+        let devList = Array.isArray(devs) ? devs : [];
+        // If editing an existing task and its assigned_to is set but not in the
+        // fetched list (e.g. the assigned dev reports to a different manager),
+        // fetch that employee and include them so the select shows the current value.
+        try {
+          if (task?.assigned_to) {
+            const exists = devList.some(
+              (d: any) => String(d.e_id) === String(task.assigned_to)
+            );
+            if (!exists) {
+              const single = await api.get(
+                `/Employee/get?id=${task.assigned_to}`
+              );
+              if (single) devList = [single, ...devList];
+            }
+          }
+        } catch (e) {
+          // ignore if single fetch fails
+        }
+        setDevelopersList(devList);
+        setManagersList(mgrs);
+        setEmployeeNamesMap(map);
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    if (isEditing) loadLists();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) setAttachFile(e.target.files[0]);
@@ -498,23 +562,39 @@ const TaskCard = ({
                     <label className="text-xs text-muted-foreground">
                       Assigned To
                     </label>
-                    <input
+                    <select
                       value={formAssignedTo}
                       onChange={(e) => setFormAssignedTo(e.target.value)}
                       className="w-full p-2 border rounded bg-background"
-                    />
+                    >
+                      <option value="">Unassigned</option>
+                      {developersList.map((d) => (
+                        <option key={d.e_id} value={String(d.e_id)}>
+                          {d.name || d.email || `Dev ${d.e_id}`}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground">
-                      Reviewer (Manager ID)
+                      Reviewer (Manager)
                     </label>
-                    <input
+                    <select
                       value={formReviewer}
                       onChange={(e) => setFormReviewer(e.target.value)}
                       className="w-full p-2 border rounded bg-background"
-                    />
+                    >
+                      <option value="">None</option>
+                      {managersList.map((m) => (
+                        <option key={m.e_id} value={String(m.e_id)}>
+                          {employeeNamesMap[m.e_id]
+                            ? `${employeeNamesMap[m.e_id]} (${m.e_id})`
+                            : m.name || m.email || `Mgr ${m.e_id}`}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">

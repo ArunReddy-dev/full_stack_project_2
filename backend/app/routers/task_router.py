@@ -65,11 +65,7 @@ def update_task_data(id: int, new_data: dict,role,user=Depends(get_current_user)
         if role not in user.roles and "Admin" not in user.roles:
             raise HTTPException(status_code=409, detail="The user doesnt have the mentioned role")
 
-        # Business rule: Admins are not allowed to update tasks at all.
-        # Return 403 Forbidden so the frontend can present a clear "not allowed" message.
-        if isinstance(role, str) and role.lower() == "admin":
-            raise HTTPException(status_code=403, detail="Admin not allowed to update the task")
-
+        # allow Admins and Managers to update tasks (Admin may not act as reviewer)
         updated = update_task(id, new_data, role, user)
         return {"detail": "Task Updated Successfully", "task": updated}
     except HTTPException as e:
