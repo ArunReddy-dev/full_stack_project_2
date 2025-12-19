@@ -100,6 +100,9 @@ const TasksPage = () => {
     "all"
   );
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // openTaskId from query param (used to open a specific TaskCard modal)
+  const params = new URLSearchParams(location.search);
+  const openTaskParam = params.get("openTask");
 
   const canCreate = user?.role === "admin" || user?.role === "manager";
 
@@ -262,7 +265,7 @@ const TasksPage = () => {
   });
 
   // Allow optional ?assignedTo=<id> query param to explicitly filter to an assignee
-  const params = new URLSearchParams(location.search);
+  // reuse the `params` URLSearchParams already declared above
   const assignedToParam = params.get("assignedTo");
   if (assignedToParam) {
     filteredTasks = filteredTasks.filter(
@@ -395,6 +398,7 @@ const TasksPage = () => {
             tasks={filteredTasks}
             onTaskUpdate={handleTaskUpdate}
             onTaskModified={() => fetchTasks()}
+            openTaskId={openTaskParam || undefined}
           />
         ) : (
           <div className="text-muted-foreground text-center py-12">

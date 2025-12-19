@@ -6,11 +6,12 @@ from typing import List
 employee_router = APIRouter(prefix="/Employee", tags=["Employee"])
 
 @employee_router.get("/getall", response_model=List[EmployeeReqRes])
-def get_all():
+def get_all(mgr_id: int | None = None, designation: str | None = None):
     try:
-        employees = get_all_employees()
-        if not employees:
-            raise HTTPException(status_code=404, detail="No employees found")
+        employees = get_all_employees(mgr_id=mgr_id, designation=designation)
+        if employees is None or (isinstance(employees, list) and len(employees) == 0):
+            # return empty list instead of 404 so callers can safely iterate
+            return []
         return employees
     except HTTPException as e:
         raise e  # Re-raise the specific HTTPException

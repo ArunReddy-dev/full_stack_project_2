@@ -27,7 +27,12 @@ const EmployeesPage = () => {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/Employee/getall");
+      // If manager, fetch only employees who report to this manager
+      let path = "/Employee/getall";
+      if (user?.role === "manager") {
+        path += `?mgr_id=${user.emp_id}`;
+      }
+      const res = await api.get(path);
       // backend returns list - if 404 thrown, we'll fall to catch
       setEmployees(Array.isArray(res) ? res : []);
     } catch (err: any) {
@@ -90,7 +95,9 @@ const EmployeesPage = () => {
     } catch (err: any) {
       toast({
         title: "Delete Failed",
-        description: err?.message || "Could not delete employee",
+        // Prefer server-provided detail if available
+        description:
+          err?.data?.detail || err?.message || "Could not delete employee",
         variant: "destructive",
       });
     }

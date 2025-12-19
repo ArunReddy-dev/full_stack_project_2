@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 import os
 from app.crud.task_crud import add_task, get_all_tasks, get_task_by_id,get_task_by_status,patch_status,update_task, delete_task
 from app.crud.attachment_crud import add_attachment, get_attachments
+from app.crud.attachment_crud import delete_attachment_by_id, delete_attachments_by_task_and_creator
 from app.core.security import get_current_user
 from app.models.models import TaskReqRes, UserRole
 from typing import List
@@ -122,6 +123,13 @@ def attach_file(
         if role and role not in user.roles and "Admin" not in user.roles:
             raise HTTPException(status_code=409, detail="The user doesnt have the mentioned role")
 
+        # remove previous attachments by this user for this task (replacement behaviour)
+        try:
+            delete_attachments_by_task_and_creator(int(id), getattr(user, "e_id", None))
+        except Exception:
+            # don't block upload if cleanup fails
+            pass
+
         # save file to uploads/<task_id>/filename
         uploads_dir = os.path.join(os.getcwd(), "uploads")
         task_dir = os.path.join(uploads_dir, str(id))
@@ -151,6 +159,23 @@ def list_attachments(id: int, role, user=Depends(get_current_user)):
 
         attachments = get_attachments(int(id))
         return attachments
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+
+
+@task_router.delete("/attachment")
+def delete_attachment(id: int, role: str, user=Depends(get_current_user)):
+    """Delete an attachment by its DB id. Requires role and current user (permission enforced in CRUD)."""
+    try:
+        # role validation: allow Admin/Manager/Developer checks via existing security
+        if role and role not in user.roles and "Admin" not in user.roles:
+            raise HTTPException(status_code=409, detail="The user doesnt have the mentioned role")
+
+        resp = delete_attachment_by_id(int(id), user=user)
+        return resp
     except HTTPException as e:
         raise e
     except Exception as e:

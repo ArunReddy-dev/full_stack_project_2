@@ -14,15 +14,18 @@ import {
 } from "recharts";
 import api from "@/lib/api";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { PieChart as PieChartIcon, ClipboardList } from "lucide-react";
 
 const ReportsPage = () => {
   const [tasksByStatusData, setTasksByStatusData] = useState<any[]>([]);
   const [tasksByPriorityData, setTasksByPriorityData] = useState<any[]>([]);
   const [totalTasks, setTotalTasks] = useState<number>(0);
+  const { user } = useAuth();
+
   const [selectedRole, setSelectedRole] = useState<
     "Developer" | "Manager" | "Admin"
-  >("Developer");
+  >(user?.role === "admin" ? "Manager" : "Developer");
 
   const fillStatus = {
     TO_DO: "hsl(210, 100%, 60%)",
@@ -139,19 +142,23 @@ const ReportsPage = () => {
                   Viewing role
                 </div>
                 <div className="inline-flex items-center gap-2">
-                  {(["Developer", "Manager", "Admin"] as const).map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => setSelectedRole(r)}
-                      className={`px-3 py-1 rounded text-sm font-medium border ${
-                        selectedRole === r
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background text-foreground border-border"
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
+                  {(["Developer", "Manager", "Admin"] as const)
+                    .filter(
+                      (r) => !(user?.role === "admin" && r === "Developer")
+                    )
+                    .map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setSelectedRole(r)}
+                        className={`px-3 py-1 rounded text-sm font-medium border ${
+                          selectedRole === r
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-foreground border-border"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
                 </div>
               </div>
             </div>

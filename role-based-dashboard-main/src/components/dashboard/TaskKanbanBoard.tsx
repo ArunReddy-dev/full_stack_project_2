@@ -18,6 +18,7 @@ interface TaskKanbanBoardProps {
   onTaskUpdate: (taskId: string, newStatus: TaskStatus) => void;
   onAddTask?: () => void;
   onTaskModified?: () => void;
+  openTaskId?: string;
 }
 
 const COLUMNS: TaskStatus[] = ["TO_DO", "IN_PROGRESS", "REVIEW", "DONE"];
@@ -27,6 +28,7 @@ const TaskKanbanBoard = ({
   onTaskUpdate,
   onAddTask,
   onTaskModified,
+  openTaskId,
 }: TaskKanbanBoardProps) => {
   const { user } = useAuth();
   const [draggingOver, setDraggingOver] = useState<string | null>(null);
@@ -201,6 +203,7 @@ const TaskKanbanBoard = ({
                                 task={task}
                                 isDragging={snapshot.isDragging}
                                 onModified={onTaskModified}
+                                openTaskId={openTaskId}
                               />
                             </div>
                           )}

@@ -2,7 +2,7 @@ import { Task, PRIORITY_CONFIG, TASK_STATUS_CONFIG } from "@/types/task";
 import { Calendar, User, Edit3, Trash2, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +18,15 @@ interface TaskCardProps {
   task: Task;
   isDragging?: boolean;
   onModified?: () => void; // called after update/delete to refresh parent
+  openTaskId?: string;
 }
 
-const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
+const TaskCard = ({
+  task,
+  isDragging,
+  onModified,
+  openTaskId,
+}: TaskCardProps) => {
   const priorityConfig = PRIORITY_CONFIG[task.priority];
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
@@ -49,6 +55,17 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
     if (r === "admin") return "Admin";
     if (r === "manager") return "Manager";
     return "Developer";
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    try {
+      await api.del(`/Task/attachment?id=${attachmentId}&role=${roleParam}`);
+      toast.success("Attachment removed");
+      fetchAttachments();
+    } catch (err: any) {
+      const detail = err?.data?.detail ?? err?.message ?? "Delete failed";
+      toast.error(String(detail));
+    }
   };
 
   const roleParam = mapRoleToBackend(user?.role);
@@ -97,12 +114,35 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
   const handleUpload = async () => {
     if (!attachFile) return toast.error("Please select a file");
     try {
+      const idForApi = getNumericId(task.t_id);
+
+      // 1) Upload file to task attachments endpoint (records in SQL attachments table)
       const fd = new FormData();
       fd.append("role", roleParam);
       fd.append("remark", attachRemark || "");
       fd.append("file", attachFile);
-      const idForApi = getNumericId(task.t_id);
       await api.post(`/Task/attach?id=${idForApi}`, fd);
+
+      // 2) Also create a remark entry in the remarks collection so the assigner
+      //    can see the remark in their notifications. Use the correct router
+      //    path (/Remark/create) and include the acting role. We don't need to
+      //    re-upload the file to GridFS here because /Task/attach already saved
+      //    the file to disk and created an attachment DB record.
+      try {
+        const rf = new FormData();
+        rf.append("task_id", String(idForApi));
+        rf.append("comment", attachRemark || "");
+        rf.append("role", roleParam);
+        // backend expects header `e_id` (int)
+        await api.post("/Remark/create", rf, {
+          e_id: String(user?.emp_id ?? ""),
+        });
+      } catch (rErr) {
+        // don't block main upload if remark storing fails; show a non-fatal toast
+        console.warn("Failed to create remark entry:", rErr);
+        toast("Saved file, but failed to add remark metadata");
+      }
+
       toast.success("File uploaded");
       setAttachFile(null);
       setAttachRemark("");
@@ -117,6 +157,76 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
       toast.error(msg);
     }
   };
+
+  const canDeveloperAddRemark = () => {
+    if (!user) return false;
+    if (user.role !== "developer") return true; // managers/admins can add
+    return task.status === "TO_DO" || task.status === "IN_PROGRESS";
+  };
+
+  const handleAddRemark = async () => {
+    if (!canDeveloperAddRemark()) {
+      return toast.error("You can add remarks only in To Do or In Progress");
+    }
+    if (!attachRemark && !attachFile)
+      return toast.error("Enter a remark or attach a file");
+    try {
+      const idForApi = getNumericId(task.t_id);
+
+      // If a file was selected, upload it via the Task attachment endpoint so
+      // the SQL attachment table reflects the uploaded file. Then create a
+      // remark record (without re-uploading the file to GridFS) so the assigner
+      // will see a notification.
+      if (attachFile) {
+        try {
+          const fd = new FormData();
+          fd.append("role", roleParam);
+          fd.append("remark", attachRemark || "");
+          fd.append("file", attachFile);
+          await api.post(`/Task/attach?id=${idForApi}`, fd);
+        } catch (e: any) {
+          const detail = e?.data?.detail ?? e?.message ?? "Upload failed";
+          return toast.error(String(detail));
+        }
+      }
+
+      // Create remark entry so notifications will surface to the assigner
+      const rf = new FormData();
+      rf.append("task_id", String(idForApi));
+      rf.append("comment", attachRemark || "");
+      rf.append("role", roleParam);
+      await api.post("/Remark/create", rf, {
+        e_id: String(user?.emp_id ?? ""),
+      });
+      toast.success("Remark added");
+      setAttachRemark("");
+      setAttachFile(null);
+      // refresh attachments/remarks
+      fetchAttachments();
+      // close dialog and notify parent to refresh
+      setOpen(false);
+      onModified?.();
+    } catch (err: any) {
+      const detail =
+        err?.data?.detail ?? err?.message ?? "Failed to add remark";
+      toast.error(String(detail));
+    }
+  };
+
+  // if openTaskId matches this task, open the dialog
+  useEffect(() => {
+    if (!openTaskId) return;
+    try {
+      if (String(openTaskId) === String(task.t_id)) {
+        setViewMode("details");
+        setOpen(true);
+        fetchAttachments();
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openTaskId]);
 
   return (
     <>
@@ -180,7 +290,7 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground line-clamp-2">
+          <p className="text-sm text-muted-foreground line-clamp-3">
             {task.description}
           </p>
 
@@ -355,7 +465,7 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                     className="w-full p-2 border rounded bg-background"
-                    rows={4}
+                    rows={2}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -451,6 +561,13 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
                           >
                             Download
                           </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAttachment(a.id)}
+                            className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded"
+                          >
+                            Remove
+                          </button>
                         </div>
                       </div>
                     ))
@@ -459,13 +576,27 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
                   <div className="pt-3 border-t mt-2">
                     <div className="grid grid-cols-1 gap-2">
                       <label className="text-xs text-muted-foreground">
-                        Add Attachment (require remark)
+                        Add Attachment / Remark
                       </label>
                       <input type="file" onChange={handleFileChange} />
+                      {attachFile && (
+                        <div className="flex items-center justify-between mt-1">
+                          <div className="text-sm text-muted-foreground">
+                            Selected: {attachFile.name}
+                          </div>
+                          <button
+                            type="button"
+                            className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded"
+                            onClick={() => setAttachFile(null)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
                       <textarea
                         value={attachRemark}
                         onChange={(e) => setAttachRemark(e.target.value)}
-                        placeholder="Enter remark (required)"
+                        placeholder="Enter remark (optional)"
                         className="w-full p-2 border rounded bg-background"
                         rows={3}
                       />
@@ -479,8 +610,19 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
                         >
                           Cancel
                         </Button>
-                        <Button onClick={handleUpload}>Upload</Button>
+                        <Button
+                          onClick={handleAddRemark}
+                          disabled={!canDeveloperAddRemark()}
+                        >
+                          Add
+                        </Button>
                       </div>
+                      {!canDeveloperAddRemark() && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Developers can add remarks only when task is To Do or
+                          In Progress.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -570,6 +712,13 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
                             >
                               Download
                             </a>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAttachment(a.id)}
+                              className="text-xs text-destructive px-2 py-1 rounded"
+                            >
+                              Remove
+                            </button>
                           </div>
                         </div>
                       ))
@@ -578,13 +727,27 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
                     <div className="pt-3 border-t mt-2">
                       <div className="grid grid-cols-1 gap-2">
                         <label className="text-xs text-muted-foreground">
-                          Add Attachment (require remark)
+                          Add Attachment / Remark
                         </label>
                         <input type="file" onChange={handleFileChange} />
+                        {attachFile && (
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="text-sm text-muted-foreground">
+                              Selected: {attachFile.name}
+                            </div>
+                            <button
+                              type="button"
+                              className="text-xs text-destructive underline"
+                              onClick={() => setAttachFile(null)}
+                            >
+                              Remove selected
+                            </button>
+                          </div>
+                        )}
                         <textarea
                           value={attachRemark}
                           onChange={(e) => setAttachRemark(e.target.value)}
-                          placeholder="Enter remark (required)"
+                          placeholder="Enter remark (optional)"
                           className="w-full p-2 border rounded bg-background"
                           rows={3}
                         />
@@ -598,8 +761,19 @@ const TaskCard = ({ task, isDragging, onModified }: TaskCardProps) => {
                           >
                             Cancel
                           </Button>
-                          <Button onClick={handleUpload}>Upload</Button>
+                          <Button
+                            onClick={handleAddRemark}
+                            disabled={!canDeveloperAddRemark()}
+                          >
+                            Add
+                          </Button>
                         </div>
+                        {!canDeveloperAddRemark() && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Developers can add remarks only when task is To Do
+                            or In Progress.
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

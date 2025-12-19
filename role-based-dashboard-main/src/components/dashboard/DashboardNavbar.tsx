@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { UserRole } from "@/types/auth";
 import {
@@ -47,6 +48,39 @@ const DashboardNavbar = () => {
   const { user, switchRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      try {
+        // fetch notifications for current user
+        // remark_router: GET /Remark/notifications
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+          }/Remark/notifications`,
+          {
+            headers: { Authorization: `Bearer ${user?.token}` },
+          }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!mounted) return;
+        setNotifications(Array.isArray(data) ? data : []);
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    load();
+    const id = setInterval(load, 15000);
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, [user]);
 
   if (!user) return null;
 
@@ -59,10 +93,10 @@ const DashboardNavbar = () => {
     if (Array.isArray(user.roles) && user.roles.length > 0) {
       user.roles.forEach((r) => set.add(String(r).toLowerCase()));
     }
-    // Admins allowed to assume other roles
+    // Admins allowed to assume Manager view (but not Developer directly)
     if (set.has("admin")) {
       set.add("manager");
-      set.add("developer");
+      // do NOT add developer here — admin should not act as employee/developer
     }
     // If no roles were present, fall back to the active role
     if (set.size === 0 && user.role) set.add(user.role);
@@ -117,14 +151,76 @@ const DashboardNavbar = () => {
         </Button>
 
         {/* Notifications */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-navbar-foreground hover:bg-white/10 relative"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-navbar-foreground hover:bg-white/10 relative"
+            >
+              <Bell className="w-5 h-5" />
+              {notifications.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-80 bg-card border-border shadow-lg">
+            <div className="px-3 py-2 border-b border-border">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Notifications
+              </p>
+            </div>
+            {notifications.length === 0 ? (
+              <DropdownMenuItem className="text-sm text-muted-foreground py-3">
+                No new notifications
+              </DropdownMenuItem>
+            ) : (
+              notifications.map((n: any) => (
+                <DropdownMenuItem
+                  key={n._id}
+                  onClick={async () => {
+                    // mark read and navigate to tasks page (open task UI is handled on tasks page)
+                    try {
+                      const fd = new FormData();
+                      fd.append("remark_id", n._id);
+                      await fetch(
+                        `${
+                          import.meta.env.VITE_API_BASE_URL ||
+                          "http://localhost:8000"
+                        }/Remark/notifications/markread`,
+                        {
+                          method: "POST",
+                          headers: { Authorization: `Bearer ${user?.token}` },
+                          body: fd,
+                        }
+                      );
+                    } catch (e) {
+                      // ignore
+                    }
+                    // navigate and open the specific task modal via query param
+                    navigate(`/dashboard/tasks?openTask=${n.task_id}`);
+                    toast(
+                      `Notification opened for task ${
+                        n.task_title || n.task_id
+                      }`
+                    );
+                  }}
+                >
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">
+                      {n.task_title
+                        ? `${n.task_title} (#${n.task_id})`
+                        : `Task #${n.task_id}`}
+                    </span>
+                    <span className="text-xs text-muted-foreground line-clamp-2">
+                      {n.comment || "New remark"}
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Profile Button */}
         <Button

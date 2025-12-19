@@ -62,11 +62,16 @@ async function request(path: string, opts: RequestOptions = {}) {
 }
 
 export const api = {
-  get: (path: string) => request(path, { method: "GET" }),
-  post: (path: string, body?: any) => request(path, { method: "POST", body }),
-  put: (path: string, body?: any) => request(path, { method: "PUT", body }),
-  patch: (path: string, body?: any) => request(path, { method: "PATCH", body }),
-  del: (path: string) => request(path, { method: "DELETE" }),
+  get: (path: string, headers?: Record<string, string>) =>
+    request(path, { method: "GET", headers }),
+  post: (path: string, body?: any, headers?: Record<string, string>) =>
+    request(path, { method: "POST", body, headers }),
+  put: (path: string, body?: any, headers?: Record<string, string>) =>
+    request(path, { method: "PUT", body, headers }),
+  patch: (path: string, body?: any, headers?: Record<string, string>) =>
+    request(path, { method: "PATCH", body, headers }),
+  del: (path: string, headers?: Record<string, string>) =>
+    request(path, { method: "DELETE", headers }),
   API_BASE,
 };
 
